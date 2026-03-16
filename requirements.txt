@@ -1,0 +1,6 @@
+aiogram==3.13.1
+aiohttp==3.10.11
+aiosqlite==0.20.0
+apscheduler==3.10.4
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
