@@ -31,16 +31,30 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger(__name__)
 
 # ══════════════════════════════════════════════════════════════
-# КОНФИГ — читаем из переменных окружения
 # ══════════════════════════════════════════════════════════════
-BOT_TOKEN            = os.environ["BOT_TOKEN"]
-ALLOWED_USER_ID      = int(os.environ["ALLOWED_USER_ID"])
-OPENWEATHER_API_KEY  = os.environ["OPENWEATHER_API_KEY"]
-YANDEX_MAPS_API_KEY  = os.environ.get("YANDEX_MAPS_API_KEY", "")
-DB_PATH              = os.environ.get("DB_PATH", "bot_data.db")
-TIMEZONE             = os.environ.get("TIMEZONE", "Europe/Moscow")
+# КОНФИГ — читаем из переменных окружения
+# Если .env файл есть рядом — читаем из него тоже
+# ══════════════════════════════════════════════════════════════
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
-OWM_BASE = "https://api.openweathermap.org/data/2.5"
+BOT_TOKEN           = os.environ.get("BOT_TOKEN", "")
+ALLOWED_USER_ID     = int(os.environ.get("ALLOWED_USER_ID", "0"))
+OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
+YANDEX_MAPS_API_KEY = os.environ.get("YANDEX_MAPS_API_KEY", "")
+DB_PATH             = os.environ.get("DB_PATH", "bot_data.db")
+TIMEZONE            = os.environ.get("TIMEZONE", "Europe/Moscow")
+
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN не задан!")
+if not ALLOWED_USER_ID:
+    raise RuntimeError("ALLOWED_USER_ID не задан!")
+if not OPENWEATHER_API_KEY:
+    raise RuntimeError("OPENWEATHER_API_KEY не задан!")
+
 
 # ══════════════════════════════════════════════════════════════
 # БАЗА ДАННЫХ
@@ -765,14 +779,35 @@ async def check_alerts_job(bot: Bot):
 # ══════════════════════════════════════════════════════════════
 # ЗАПУСК
 # ══════════════════════════════════════════════════════════════
+async def set_commands(bot: Bot):
+    """Устанавливает меню команд в Telegram (кнопка Menu)."""
+    from aiogram.types import BotCommand, BotCommandScopeDefault
+    commands = [
+        BotCommand(command="today",     description="☀️ Погода сегодня"),
+        BotCommand(command="tomorrow",  description="📅 Прогноз на завтра"),
+        BotCommand(command="traffic",   description="🚗 Пробки сейчас"),
+        BotCommand(command="news",      description="📰 Новости"),
+        BotCommand(command="todo",      description="📋 Мои задачи"),
+        BotCommand(command="add",       description="➕ Добавить задачу"),
+        BotCommand(command="alerts",    description="🔔 Настройки алертов"),
+        BotCommand(command="settings",  description="⚙️ Настройки бота"),
+        BotCommand(command="help",      description="❓ Помощь"),
+    ]
+    await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
+    logger.info("Меню команд установлено")
+
 async def main():
     await init_db()
     bot = Bot(token=BOT_TOKEN)
     dp  = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
+
+    # Устанавливаем меню команд при старте
+    await set_commands(bot)
+
     sched = setup_scheduler(bot)
     sched.start()
-    logger.info("Бот запущен!")
+    logger.info("Бот запущен! ID пользователя: %s", ALLOWED_USER_ID)
     try:
         await dp.start_polling(bot, allowed_updates=["message","callback_query"])
     finally:
